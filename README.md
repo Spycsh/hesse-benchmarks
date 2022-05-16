@@ -29,3 +29,18 @@ services:
     volumes:
     - ./benchmarks:/app/results
 ```
+
+## What is it
+
+hesse-benchmarks is a Docker image, which is basically a multi-thread Kafka consumer that automatically
+
+1) read the benchmarking results (time) from hesse egressed Kafka topics.
+2) store and plot benchmarking results in the container folder volume mapping to the host benchmarks folder of [hesse](https://github.com/Spycsh/hesse)
+
+With the plotted benchmarking results, we are expected to
+
+1) find the sweet spot of indexing bucket size
+2) persist and plot the time for Kafka producing in hesse
+3) persist and plot the time for edge storage in RocksDB
+4) persist and plot the time for filtering (retrieving) state of a query
+5) persist and plot the duration of the queries
