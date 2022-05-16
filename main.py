@@ -11,11 +11,15 @@ from multiprocessing import Process
 from kafka.errors import NoBrokersAvailable
 from kafka import KafkaConsumer
 
+import matplotlib.pyplot as plt
+
 Arg = namedtuple('Arg', ['key', 'default', 'type'])
 
 APP_KAFKA_HOST = Arg(key="APP_KAFKA_HOST", default="kafka-broker:9092", type=str)
 APP_KAFKA_TOPICS = Arg(key="APP_KAFKA_TOPICS", default="indexing-time producing-time storage-time filter-time "
-                                                       "query-results configs", type=str)
+                                                       "query-results", type=str)
+APP_PLOT_FLAG = Arg(key="APP_PLOT_FLAG", default="false", type=lambda s: s.lower() == "true")   # whether to plot
+APP_DELAY_PLOT_START_SECONDS = Arg(key="APP_DELAY_PLOT_START_SECONDS", default="200", type=int) # after how long should it plot
 
 
 def env(arg: Arg):
@@ -66,11 +70,61 @@ class KConsumer(object):
                     f.write("%s %s %s '%s'\n" % (qid_uid[0], qid_uid[1], value_dict['time'], value_dict['result_string']))
                 else:
                     f.write("%s\n" % message.value.decode('utf-8'))
-                # TODO plot graph
 
 
 def handler(number, frame):
     sys.exit(0)
+
+
+def plot_result(output_path):
+    storage_time_file_path = output_path + "storage-time.txt"
+    filter_time_file_path = output_path + "filter-time.txt"
+    producing_time_file_path = output_path + "producing-time.txt"
+    query_results_file_path = output_path + "query-results.txt"
+
+    if os.path.isfile(storage_time_file_path):
+        with open(storage_time_file_path, 'r') as f:
+            lines = f.readlines()
+            x = [line.split()[0] for line in lines]
+            y = [line.split()[1] for line in lines]
+            plt.plot(x, y)
+            plt.xlabel('storage operation index')
+            plt.ylabel('storage time')
+            plt.title('storage time for each edge')
+            plt.savefig(output_path + 'storage-time.png', dpi=300, bbox_inches='tight')
+
+    if os.path.isfile(filter_time_file_path):
+        with open(filter_time_file_path, 'r') as f:
+            lines = f.readlines()
+            x = [line.split()[0] for line in lines]
+            y = [line.split()[1] for line in lines]
+            plt.plot(x, y)
+            plt.xlabel('filter operation index')
+            plt.ylabel('filter time')
+            plt.title('filter time for each edge')
+            plt.savefig(output_path + 'filter-time.png', dpi=300, bbox_inches='tight')
+
+    if os.path.isfile(producing_time_file_path):
+        with open(producing_time_file_path, 'r') as f:
+            lines = f.readlines()
+            x = [line.split()[0] for line in lines]
+            y = [line.split()[1] for line in lines]
+            plt.plot(x, y)
+            plt.xlabel('producing operation index')
+            plt.ylabel('producing time')
+            plt.title('Kafka producing time for each edge')
+            plt.savefig(output_path + 'producing-time.png', dpi=300, bbox_inches='tight')
+
+    if os.path.isfile(query_results_file_path):
+        with open(query_results_file_path, 'r') as f:
+            lines = f.readlines()
+            x = [line.split()[0] for line in lines]
+            y = [line.split()[1] for line in lines]
+            plt.plot(x, y)
+            plt.xlabel('query index')
+            plt.ylabel('query time')
+            plt.title('handling time for each query')
+            plt.savefig(output_path + 'query-results-time.png', dpi=300, bbox_inches='tight')
 
 
 def main():
@@ -100,9 +154,10 @@ def main():
     if 'query-results' in topics:
         t5 = Process(target=consume_data, args=('query-results', env(APP_KAFKA_HOST), output_path))
         t5.start()
-    if 'configs' in topics:
-        t6 = Process(target=consume_data, args=('configs', env(APP_KAFKA_HOST), output_path))
-        t6.start()
+
+    if env(APP_PLOT_FLAG):
+        time.sleep(env(APP_DELAY_PLOT_START_SECONDS))   # wait after enough time to plot
+        plot_result(output_path)
 
 
 if __name__ == "__main__":
