@@ -19,7 +19,7 @@ APP_KAFKA_HOST = Arg(key="APP_KAFKA_HOST", default="kafka-broker:9092", type=str
 APP_KAFKA_TOPICS = Arg(key="APP_KAFKA_TOPICS", default="indexing-time storage-time filter-time "
                                                        "query-results", type=str)
 APP_PLOT_FLAG = Arg(key="APP_PLOT_FLAG", default="false", type=lambda s: s.lower() == "true")   # whether to plot results
-
+APP_DELEY_PLOT = Arg(key="APP_DELEY_PLOT", default="20", type=int)  # how long to wait after one file is created and before plotting
 
 def env(arg: Arg):
     val = os.environ.get(arg.key, arg.default)
@@ -75,48 +75,61 @@ def handler(number, frame):
     sys.exit(0)
 
 
-def plot_result(output_path, topics):
+def plot_result(output_path, topics, delay):
     storage_time_file_path = output_path + "storage-time.txt"
     filter_time_file_path = output_path + "filter-time.txt"
     query_results_file_path = output_path + "query-results.txt"
 
     while ('storage-time' in topics):
         if os.path.isfile(storage_time_file_path):
+            time.sleep(delay)
             with open(storage_time_file_path, 'r') as f:
                 lines = f.readlines()
-                x = [line.split()[0] for line in lines]
-                y = [line.split()[1] for line in lines]
+                x = [int(line.split()[0]) for line in lines]
+                y = [int(line.split()[1]) for line in lines]
+                print(x)
+                print(y)
                 plt.plot(x, y)
                 plt.xlabel('storage operation index')
                 plt.ylabel('storage time')
                 plt.title('storage time for each edge')
                 plt.savefig(output_path + 'storage-time.png', dpi=300, bbox_inches='tight')
+                plt.cla()
             break
 
     while ('filter-time' in topics):
         if os.path.isfile(filter_time_file_path):
+            time.sleep(delay)
             with open(filter_time_file_path, 'r') as f:
                 lines = f.readlines()
-                x = [line.split()[0] for line in lines]
-                y = [line.split()[1] for line in lines]
+                x = [int(line.split()[0]) for line in lines]
+                y = [int(line.split()[1]) for line in lines]
+                print(x)
+                print(y)
                 plt.plot(x, y)
                 plt.xlabel('filter operation index')
                 plt.ylabel('filter time')
                 plt.title('filter time for each edge')
                 plt.savefig(output_path + 'filter-time.png', dpi=300, bbox_inches='tight')
+                plt.cla()
             break
 
     while ('query-results' in topics):
         if os.path.isfile(query_results_file_path):
+            time.sleep(delay)
             with open(query_results_file_path, 'r') as f:
                 lines = f.readlines()
-                x = [line.split()[0] for line in lines]
-                y = [line.split()[1] for line in lines]
+                # query results sort
+                x = sorted([int(line.split()[0]) for line in lines])
+                y = sorted([int(line.split()[2]) for line in lines])
+                print(x)
+                print(y)
                 plt.plot(x, y)
                 plt.xlabel('query index')
                 plt.ylabel('query time')
                 plt.title('handling time for each query')
                 plt.savefig(output_path + 'query-results-time.png', dpi=300, bbox_inches='tight')
+                plt.cla()
         break
 
 
@@ -146,7 +159,7 @@ def main():
         t5.start()
 
     if env(APP_PLOT_FLAG):
-        plot_result(output_path, topics)
+        plot_result(output_path, topics, env(APP_DELEY_PLOT))
 
 
 if __name__ == "__main__":
