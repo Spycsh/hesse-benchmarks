@@ -91,8 +91,8 @@ def plot_result(output_path, topics, delay):
                 print(y)
                 plt.plot(x, y)
                 plt.xlabel('storage operation index')
-                plt.ylabel('storage time')
-                plt.title('storage time for each edge')
+                plt.ylabel('storage time (nanoseconds)')
+                plt.title('time for each edge storage operation')
                 plt.savefig(output_path + 'storage-time.png', dpi=300, bbox_inches='tight')
                 plt.cla()
             break
@@ -108,8 +108,8 @@ def plot_result(output_path, topics, delay):
                 print(y)
                 plt.plot(x, y)
                 plt.xlabel('filter operation index')
-                plt.ylabel('filter time')
-                plt.title('filter time for each edge')
+                plt.ylabel('filter time (nanoseconds)')
+                plt.title('time for each filter operation')
                 plt.savefig(output_path + 'filter-time.png', dpi=300, bbox_inches='tight')
                 plt.cla()
             break
@@ -126,8 +126,8 @@ def plot_result(output_path, topics, delay):
                 print(y)
                 plt.plot(x, y)
                 plt.xlabel('query index')
-                plt.ylabel('query time')
-                plt.title('handling time for each query')
+                plt.ylabel('query time (milliseconds)')
+                plt.title('time for handling each query')
                 plt.savefig(output_path + 'query-results-time.png', dpi=300, bbox_inches='tight')
                 plt.cla()
         break
