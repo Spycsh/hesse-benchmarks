@@ -47,23 +47,25 @@ class KConsumer(object):
         self.output_path = output_path
 
     def consume(self):
+        start_time = time.time()
+        msg_batch = [] # batch messages to decrease file IO
+        # message attrs: topic, partition, offset, key, value
         for message in self.consumer:
-            with open(self.output_path + message.topic + '.txt', 'a') as f:
-                # f.write("%s:%d:%d: key=%s value=%s\n" % (message.topic, message.partition,
-                #                                          message.offset, message.key,
-                #                                          message.value))
-                if message.topic == "storage-time" or message.topic == "filter-time":
-                    value_dict = json.loads(message.value.decode('utf-8'))
-                    f.write("%s %s %s %s\n" % (message.key.decode('utf-8'),
-                                               value_dict['time'],
-                                               value_dict['overall_time'],
-                                               value_dict['average_time']))
-                elif message.topic == "query-results":
-                    qid_uid = str(message.key.decode('utf-8')).split(' ')
-                    value_dict = json.loads(message.value.decode('utf-8'), strict=False)
-                    f.write("%s %s %s '%s'\n" % (qid_uid[0], qid_uid[1], value_dict['time'], value_dict['result_string']))
-                else:
-                    f.write("%s\n" % message.value.decode('utf-8'))
+            if message.topic == "storage-time" or message.topic == "filter-time":
+                value_dict = json.loads(message.value.decode('utf-8'))
+                msg_batch.append("%s %s %s %s\n" % (message.key.decode('utf-8'),
+                                                    value_dict['time'],
+                                                    value_dict['overall_time'],
+                                                    value_dict['average_time']))
+            elif message.topic == "query-results":
+                qid_uid = str(message.key.decode('utf-8')).split(' ')
+                value_dict = json.loads(message.value.decode('utf-8'), strict=False)
+                msg_batch.append("%s %s %s '%s'\n" % (qid_uid[0], qid_uid[1], value_dict['time'], value_dict['result_string']))
+            if len(msg_batch) > 5000 or time.time() - start_time > 10:
+                with open(self.output_path + message.topic + '.txt', 'a') as f:
+                    f.writelines(msg_batch)
+                    msg_batch = []
+                start_time = time.time()
 
 
 def handler(number, frame):
