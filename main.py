@@ -14,8 +14,13 @@ from kafka import KafkaConsumer
 Arg = namedtuple('Arg', ['key', 'default', 'type'])
 
 APP_KAFKA_HOST = Arg(key="APP_KAFKA_HOST", default="kafka-broker:9092", type=str)
-APP_KAFKA_TOPICS = Arg(key="APP_KAFKA_TOPICS", default="indexing-time storage-time filter-time "
+APP_KAFKA_TOPICS = Arg(key="APP_KAFKA_TOPICS", default="storage-time filter-time "
                                                        "query-results", type=str)
+# Dump the statistics to file every APP_DUMP_INTERVAL records
+APP_DUMP_INTERVAL = Arg(key="APP_DUMP_INTERVAL", default="500", type=int)
+# Dump the last statistics and END signal if this is specified
+APP_DUMP_END = Arg(key="APP_DUMP_END", default="-1", type=int)
+
 def env(arg: Arg):
     val = os.environ.get(arg.key, arg.default)
     return arg.type(val)
@@ -47,25 +52,29 @@ class KConsumer(object):
         self.output_path = output_path
 
     def consume(self):
-        start_time = time.time()
-        msg_batch = [] # batch messages to decrease file IO
-        # message attrs: topic, partition, offset, key, value
-        for message in self.consumer:
+        # message attrs sent from Hesse egress: topic, partition, offset, key, value
+        for idx, message in enumerate(self.consumer):
             if message.topic == "storage-time" or message.topic == "filter-time":
-                value_dict = json.loads(message.value.decode('utf-8'))
-                msg_batch.append("%s %s %s %s\n" % (message.key.decode('utf-8'),
-                                                    value_dict['time'],
-                                                    value_dict['overall_time'],
-                                                    value_dict['average_time']))
+                end = env(APP_DUMP_END)
+                interval = env(APP_DUMP_INTERVAL)
+                # if APP_DUMP_END == -1, record every interval (Streaming)
+                # otherwise, record when idx < APP_DUMP_END (Dataset)
+                if (idx < end or end == -1) and idx % interval == 0:
+                    with open(self.output_path + message.topic + '.txt', 'a') as f:
+                        value_dict = json.loads(message.value.decode('utf-8'))
+                        f.writelines("Index: {} Overall time: {} Average time: {}\n"
+                            .format(message.key.decode('utf-8'), value_dict['overall_time'], value_dict['average_time']))
+                elif idx == end:
+                    with open(self.output_path + message.topic + '.txt', 'a') as f:
+                        value_dict = json.loads(message.value.decode('utf-8'))
+                        f.writelines("Index: {} Overall time: {} Average time: {}\n"
+                            .format(message.key.decode('utf-8'), value_dict['overall_time'], value_dict['average_time']))
+                        f.writelines("===========END OF RECORDING TOPIC {}===========".format(message.topic))
             elif message.topic == "query-results":
                 qid_uid = str(message.key.decode('utf-8')).split(' ')
                 value_dict = json.loads(message.value.decode('utf-8'), strict=False)
-                msg_batch.append("%s %s %s '%s'\n" % (qid_uid[0], qid_uid[1], value_dict['time'], value_dict['result_string']))
-            if len(msg_batch) > 5000 or time.time() - start_time > 10:
                 with open(self.output_path + message.topic + '.txt', 'a') as f:
-                    f.writelines(msg_batch)
-                    msg_batch = []
-                start_time = time.time()
+                    f.writelines("%s %s %s '%s'\n" % (qid_uid[0], qid_uid[1], value_dict['time'], value_dict['result_string']))
 
 
 def handler(number, frame):
@@ -84,9 +93,6 @@ def main():
     output_path = '/app/results/' + strftime("results_%Y_%m_%d_%H_%M_%S/", gmtime())
     os.mkdir(output_path)
 
-    if 'indexing-time' in topics:
-        t1 = Process(target=consume_data, args=('indexing-time', env(APP_KAFKA_HOST), output_path,))
-        t1.start()
     if 'storage-time' in topics:
         t3 = Process(target=consume_data, args=('storage-time', env(APP_KAFKA_HOST), output_path))
         t3.start()
